@@ -11,7 +11,7 @@
     content="width=device-width, initial-scale=1.0"
   />
 
-  <title>TaskFlow Storage Test</title>
+  <title>TaskFlow — Telegram API Authentication</title>
 
   <script src="./telegram-web-app.js"></script>
 
@@ -153,6 +153,15 @@
       line-height: 1.6;
     }
 
+    .auth-panel {
+      margin-top: 18px;
+      padding: 14px;
+      border: 1px solid rgba(127,127,127,.25);
+      border-radius: 14px;
+    }
+
+    .auth-panel p { line-height: 1.8; }
+
     .success {
       color: #14833b;
     }
@@ -221,6 +230,13 @@
       </div>
 
 
+      <section class="auth-panel" aria-labelledby="api-auth-heading">
+        <h2 id="api-auth-heading">اتصال امن به TaskFlow API</h2>
+        <p class="subtitle">درخواست با initData خام تلگرام ارسال می‌شود؛ هیچ توکن رباتی در این صفحه قرار ندارد.</p>
+        <button id="auth-button" type="button">🔐 تست احراز هویت تلگرام</button>
+        <div id="auth-status" class="result" role="status" aria-live="polite">در انتظار شروع تست...</div>
+      </section>
+
       <h2>
         Telegram CloudStorage
       </h2>
@@ -271,8 +287,68 @@
 
   <script>
 
+    const API_URL = "https://taskflow-reminder.ahmad-ap0111-1.workers.dev";
+
     const tg =
       window.Telegram?.WebApp;
+
+    const authStatus = document.getElementById("auth-status");
+    const authButton = document.getElementById("auth-button");
+
+    function setAuthStatus(message, type = "") {
+      authStatus.className = "result" + (type ? " " + type : "");
+      authStatus.textContent = message;
+    }
+
+    async function authenticateTelegram() {
+      const rawInitData = tg?.initData;
+
+      if (!rawInitData) {
+        setAuthStatus(
+          "❌ initData در دسترس نیست. Mini App را از طریق خود ربات در تلگرام باز کن.",
+          "error"
+        );
+        return;
+      }
+
+      authButton.disabled = true;
+      setAuthStatus("در حال اعتبارسنجی امن در Cloudflare Worker...");
+
+      try {
+        const response = await fetch(API_URL + "/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData: rawInitData }),
+          cache: "no-store"
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.authenticated) {
+          throw new Error(
+            "HTTP " + response.status + ": " +
+            (result.error || "Authentication failed")
+          );
+        }
+
+        const user = result.user || {};
+        setAuthStatus(
+          "✅ authenticated: true\n" +
+          "Telegram user ID: " + user.id + "\n" +
+          "Name: " + (user.first_name || "") + "\n" +
+          "Username: " + (user.username || "—"),
+          "success"
+        );
+      } catch (error) {
+        setAuthStatus(
+          "❌ احراز هویت ناموفق بود.\n" +
+          (error?.message || String(error)) +
+          "\nاگر Failed to fetch دیدی، CORS و MINI_APP_ORIGIN را بررسی کن.",
+          "error"
+        );
+      } finally {
+        authButton.disabled = false;
+      }
+    }
 
     const status =
       document.getElementById(
@@ -686,6 +762,8 @@
     // -----------------------------
     // Events
     // -----------------------------
+
+    authButton.addEventListener("click", authenticateTelegram);
 
     document
       .getElementById(
