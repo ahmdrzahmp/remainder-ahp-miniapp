@@ -1,10 +1,21 @@
-
 (function () {
   "use strict";
 
+  // -----------------------------
+  // Helpers
+  // -----------------------------
+
+  function randomId() {
+    return (
+      Date.now().toString(36) +
+      "_" +
+      Math.random().toString(36).slice(2, 10)
+    );
+  }
+
   function getLaunchParams() {
     const hash = window.location.hash.startsWith("#")
-      ? window.location.hash.substring(1)
+      ? window.location.hash.slice(1)
       : window.location.hash;
 
     const hashParams = new URLSearchParams(hash);
@@ -18,7 +29,7 @@
       initData: get("tgWebAppData"),
       version: get("tgWebAppVersion"),
       platform: get("tgWebAppPlatform"),
-      themeParamsRaw: get("tgWebAppThemeParams")
+      themeParamsRaw: get("tgWebAppThemeParams"),
     };
   }
 
@@ -36,29 +47,13 @@
         result[key] = value;
       }
 
-      if (result.user) {
-        try {
-          result.user = JSON.parse(result.user);
-        } catch (error) {
-          console.warn("Could not parse Telegram user:", error);
+      ["user", "receiver", "chat"].forEach((field) => {
+        if (result[field]) {
+          try {
+            result[field] = JSON.parse(result[field]);
+          } catch (_) {}
         }
-      }
-
-      if (result.receiver) {
-        try {
-          result.receiver = JSON.parse(result.receiver);
-        } catch (error) {
-          console.warn("Could not parse Telegram receiver:", error);
-        }
-      }
-
-      if (result.chat) {
-        try {
-          result.chat = JSON.parse(result.chat);
-        } catch (error) {
-          console.warn("Could not parse Telegram chat:", error);
-        }
-      }
+      });
 
       return result;
     } catch (error) {
@@ -68,142 +63,398 @@
   }
 
   function parseThemeParams(raw) {
-    if (!raw) {
-      return {};
-    }
+    if (!raw) return {};
 
     try {
       return JSON.parse(raw);
-    } catch (error) {
-      console.warn("Could not parse theme params:", error);
+    } catch (_) {
       return {};
     }
   }
+
+  // -----------------------------
+  // Telegram event bridge
+  // -----------------------------
+
+  const pendingCallbacks = new Map();
 
   function postTelegramEvent(eventType, eventData) {
     const data = eventData || {};
 
-    try {
-      if (
-        window.TelegramWebviewProxy &&
-        typeof window.TelegramWebviewProxy.postEvent === "function"
-      ) {
-        window.TelegramWebviewProxy.postEvent(
-          eventType,
-          JSON.stringify(data)
-        );
+    // Telegram Desktop / mobile WebView
+    if (
+      window.TelegramWebviewProxy &&
+      typeof window.TelegramWebviewProxy.postEvent === "function"
+    ) {
+      window.TelegramWebviewProxy.postEvent(
+        eventType,
+        JSON.stringify(data)
+      );
 
-        return true;
-      }
-    } catch (error) {
-      console.warn("TelegramWebviewProxy failed:", error);
+      return true;
     }
 
-    try {
-      if (
-        window.external &&
-        typeof window.external.notify === "function"
-      ) {
-        window.external.notify(
-          JSON.stringify({
-            eventType: eventType,
-            eventData: data
-          })
-        );
+    // Windows Phone / legacy style
+    if (
+      window.external &&
+      typeof window.external.notify === "function"
+    ) {
+      window.external.notify(
+        JSON.stringify({
+          eventType: eventType,
+          eventData: data,
+        })
+      );
 
-        return true;
-      }
-    } catch (error) {
-      console.warn("external.notify failed:", error);
+      return true;
     }
+
+    // iframe fallback
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        JSON.stringify({
+          eventType: eventType,
+          eventData: data,
+        }),
+        "*"
+      );
+
+      return true;
+    }
+
+    console.warn("No Telegram bridge available for:", eventType);
 
     return false;
   }
 
+  function handleTelegramEvent(eventType, eventData) {
+    let data = eventData;
+
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch (_) {}
+    }
+
+    if (eventType === "custom_method_invoked") {
+      const requestId = data?.req_id;
+
+      if (!requestId) {
+        return;
+      }
+
+      const callback = pendingCallbacks.get(requestId);
+
+      if (!callback) {
+        return;
+      }
+
+      pendingCallbacks.delete(requestId);
+
+      if (data.error) {
+        callback(data.error, null);
+        return;
+      }
+
+      let result = data.result;
+
+      // Some clients may return JSON as a string.
+      if (typeof result === "string") {
+        try {
+          result = JSON.parse(result);
+        } catch (_) {}
+      }
+
+      callback(null, result);
+    }
+  }
+
+  // Telegram clients commonly call these global receive methods.
+  window.TelegramGameProxy_receiveEvent = function (
+    eventType,
+    eventData
+  ) {
+    handleTelegramEvent(eventType, eventData);
+  };
+
+  window.TelegramGameProxy = {
+    receiveEvent: function (eventType, eventData) {
+      handleTelegramEvent(eventType, eventData);
+    },
+  };
+
+  // -----------------------------
+  // WebView API
+  // -----------------------------
+
+  const WebView = {
+    postEvent: postTelegramEvent,
+
+    receiveEvent: function (eventType, eventData) {
+      handleTelegramEvent(eventType, eventData);
+    },
+  };
+
+  // -----------------------------
+  // Custom methods
+  // -----------------------------
+
+  function invokeCustomMethod(method, params, callback) {
+    const requestId = randomId();
+
+    if (typeof callback === "function") {
+      pendingCallbacks.set(requestId, callback);
+    }
+
+    const success = postTelegramEvent(
+      "web_app_invoke_custom_method",
+      {
+        req_id: requestId,
+        method: method,
+        params: params || {},
+      }
+    );
+
+    if (!success) {
+      pendingCallbacks.delete(requestId);
+
+      if (typeof callback === "function") {
+        callback(
+          "Telegram bridge unavailable",
+          null
+        );
+      }
+    }
+
+    // Avoid callbacks hanging forever.
+    setTimeout(function () {
+      if (pendingCallbacks.has(requestId)) {
+        const cb = pendingCallbacks.get(requestId);
+
+        pendingCallbacks.delete(requestId);
+
+        cb(
+          "Telegram request timeout",
+          null
+        );
+      }
+    }, 10000);
+  }
+
+  // -----------------------------
+  // CloudStorage
+  // -----------------------------
+
+  const CloudStorage = {};
+
+  CloudStorage.setItem = function (
+    key,
+    value,
+    callback
+  ) {
+    invokeCustomMethod(
+      "saveStorageValue",
+      {
+        key: String(key),
+        value: String(value),
+      },
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.getItem = function (
+    key,
+    callback
+  ) {
+    CloudStorage.getItems(
+      [key],
+      function (error, result) {
+        if (error) {
+          callback?.(error);
+          return;
+        }
+
+        callback?.(
+          null,
+          result ? result[key] : undefined
+        );
+      }
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.getItems = function (
+    keys,
+    callback
+  ) {
+    invokeCustomMethod(
+      "getStorageValues",
+      {
+        keys: keys.map(String),
+      },
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.removeItem = function (
+    key,
+    callback
+  ) {
+    CloudStorage.removeItems(
+      [key],
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.removeItems = function (
+    keys,
+    callback
+  ) {
+    invokeCustomMethod(
+      "deleteStorageValues",
+      {
+        keys: keys.map(String),
+      },
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.getKeys = function (
+    callback
+  ) {
+    invokeCustomMethod(
+      "getStorageKeys",
+      {},
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  // -----------------------------
+  // Mini App initialization
+  // -----------------------------
+
   const launch = getLaunchParams();
 
-  const initDataUnsafe = parseInitData(launch.initData);
-  const themeParams = parseThemeParams(launch.themeParamsRaw);
+  const initDataUnsafe =
+    parseInitData(launch.initData);
+
+  const themeParams =
+    parseThemeParams(
+      launch.themeParamsRaw
+    );
 
   const WebApp = {
     initData: launch.initData || "",
 
     initDataUnsafe: initDataUnsafe,
 
-    version: launch.version || "unknown",
+    version:
+      launch.version || "unknown",
 
-    platform: launch.platform || "unknown",
+    platform:
+      launch.platform || "unknown",
 
     themeParams: themeParams,
 
-    colorScheme: "light",
-
-    isExpanded: false,
+    CloudStorage: CloudStorage,
 
     ready: function () {
-      postTelegramEvent("web_app_ready", {});
+      postTelegramEvent(
+        "web_app_ready",
+        {}
+      );
     },
 
     expand: function () {
-      const success = postTelegramEvent("web_app_expand", {});
-
-      if (success) {
-        this.isExpanded = true;
-      }
+      postTelegramEvent(
+        "web_app_expand",
+        {}
+      );
     },
 
     close: function () {
-      postTelegramEvent("web_app_close", {});
-    }
+      postTelegramEvent(
+        "web_app_close",
+        {}
+      );
+    },
   };
 
-  if (themeParams.bg_color) {
-    document.documentElement.style.setProperty(
+  // -----------------------------
+  // Theme variables
+  // -----------------------------
+
+  const cssMap = {
+    bg_color:
       "--tg-theme-bg-color",
-      themeParams.bg_color
-    );
-  }
 
-  if (themeParams.text_color) {
-    document.documentElement.style.setProperty(
+    text_color:
       "--tg-theme-text-color",
-      themeParams.text_color
-    );
-  }
 
-  if (themeParams.hint_color) {
-    document.documentElement.style.setProperty(
+    hint_color:
       "--tg-theme-hint-color",
-      themeParams.hint_color
-    );
-  }
 
-  if (themeParams.button_color) {
-    document.documentElement.style.setProperty(
+    button_color:
       "--tg-theme-button-color",
-      themeParams.button_color
-    );
-  }
 
-  if (themeParams.button_text_color) {
-    document.documentElement.style.setProperty(
+    button_text_color:
       "--tg-theme-button-text-color",
-      themeParams.button_text_color
-    );
-  }
 
-  if (themeParams.secondary_bg_color) {
-    document.documentElement.style.setProperty(
+    secondary_bg_color:
       "--tg-theme-secondary-bg-color",
-      themeParams.secondary_bg_color
-    );
-  }
+  };
 
-  window.Telegram = window.Telegram || {};
-  window.Telegram.WebApp = WebApp;
+  Object.entries(cssMap).forEach(
+    ([telegramKey, cssVariable]) => {
+      if (themeParams[telegramKey]) {
+        document.documentElement.style.setProperty(
+          cssVariable,
+          themeParams[telegramKey]
+        );
+      }
+    }
+  );
 
-  console.log("Local Telegram bridge loaded.");
-  console.log("Platform:", WebApp.platform);
-  console.log("Version:", WebApp.version);
-  console.log("User:", WebApp.initDataUnsafe.user);
+  // -----------------------------
+  // Export global Telegram object
+  // -----------------------------
+
+  window.Telegram =
+    window.Telegram || {};
+
+  window.Telegram.WebView =
+    WebView;
+
+  window.Telegram.WebApp =
+    WebApp;
+
+  console.log(
+    "TaskFlow Telegram bridge loaded"
+  );
+
+  console.log(
+    "Platform:",
+    WebApp.platform
+  );
+
+  console.log(
+    "Version:",
+    WebApp.version
+  );
+
+  console.log(
+    "User:",
+    WebApp.initDataUnsafe.user
+  );
 })();
