@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>TaskFlow</title>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: var(--tg-theme-bg-color, #ffffff);
+      color: var(--tg-theme-text-color, #111111);
+    }
+
+    .card {
+      max-width: 480px;
+      margin: 40px auto;
+      padding: 24px;
+      border-radius: 16px;
+      background: var(--tg-theme-secondary-bg-color, #f3f3f3);
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .muted {
+      color: var(--tg-theme-hint-color, #777777);
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      cursor: pointer;
+      background: var(--tg-theme-button-color, #2481cc);
+      color: var(--tg-theme-button-text-color, #ffffff);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>TaskFlow</h1>
+
+    <p>Mini App با موفقیت باز شد ✅</p>
+
+    <p class="muted" id="user-info">
+      در حال دریافت اطلاعات تلگرام...
+    </p>
+
+    <button onclick="showTelegramInfo()">
+      نمایش اطلاعات اتصال
+    </button>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+
+    tg.ready();
+    tg.expand();
+
+    const user = tg.initDataUnsafe?.user;
+
+    if (user) {
+      document.getElementById("user-info").textContent =
+        `سلام ${user.first_name || ""} 👋`;
+    } else {
+      document.getElementById("user-info").textContent =
+        "اطلاعات کاربر دریافت نشد. اگر صفحه را خارج از Telegram باز کرده‌ای، طبیعی است.";
+    }
+
+    function showTelegramInfo() {
+      alert(
+        `Telegram WebApp connected: ${!!window.Telegram?.WebApp}\n` +
+        `User available: ${!!user}`
+      );
+    }
+  </script>
+</body>
+</html>
