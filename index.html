@@ -11,12 +11,8 @@
     content="width=device-width, initial-scale=1.0"
   />
 
-  <title>Remainder Ahp</title>
+  <title>TaskFlow Storage Test</title>
 
-  <!--
-    Local Telegram bridge.
-    No request to telegram.org is required.
-  -->
   <script src="./telegram-web-app.js"></script>
 
   <style>
@@ -27,8 +23,7 @@
 
     body {
       margin: 0;
-
-      padding: 24px;
+      padding: 20px;
 
       font-family:
         system-ui,
@@ -51,13 +46,12 @@
     }
 
     .container {
-      max-width: 520px;
-
-      margin: 50px auto;
+      max-width: 540px;
+      margin: 24px auto;
     }
 
     .card {
-      padding: 24px;
+      padding: 22px;
 
       border-radius: 20px;
 
@@ -70,30 +64,68 @@
 
     h1 {
       margin-top: 0;
-
-      margin-bottom: 20px;
-
-      font-size: 30px;
+      margin-bottom: 8px;
     }
 
-    .message {
-      font-size: 17px;
-
-      line-height: 1.8;
+    h2 {
+      margin-top: 28px;
+      font-size: 18px;
     }
 
-    .success {
-      color: #1b8f4b;
+    .subtitle {
+      color:
+        var(
+          --tg-theme-hint-color,
+          #777
+        );
+
+      line-height: 1.7;
+
+      font-size: 14px;
     }
 
-    .error {
-      color: #d93025;
-    }
-
-    .debug {
-      margin-top: 20px;
+    button {
+      width: 100%;
 
       padding: 14px;
+
+      margin-top: 10px;
+
+      border: none;
+
+      border-radius: 13px;
+
+      cursor: pointer;
+
+      font-size: 15px;
+
+      background:
+        var(
+          --tg-theme-button-color,
+          #2481cc
+        );
+
+      color:
+        var(
+          --tg-theme-button-text-color,
+          #fff
+        );
+    }
+
+    button.secondary {
+      background: #666;
+    }
+
+    button.danger {
+      background: #b3261e;
+    }
+
+    .result {
+      margin-top: 18px;
+
+      padding: 14px;
+
+      min-height: 80px;
 
       border-radius: 14px;
 
@@ -105,7 +137,8 @@
 
       word-break: break-word;
 
-      background: rgba(0, 0, 0, 0.06);
+      background:
+        rgba(0, 0, 0, 0.07);
 
       font-family:
         ui-monospace,
@@ -120,46 +153,25 @@
       line-height: 1.6;
     }
 
-    button {
-      width: 100%;
-
-      margin-top: 20px;
-
-      padding: 15px;
-
-      border: 0;
-
-      border-radius: 14px;
-
-      cursor: pointer;
-
-      font-size: 16px;
-
-      background:
-        var(
-          --tg-theme-button-color,
-          #2481cc
-        );
-
-      color:
-        var(
-          --tg-theme-button-text-color,
-          #ffffff
-        );
+    .success {
+      color: #14833b;
     }
 
-    .small {
-      margin-top: 18px;
+    .error {
+      color: #c62828;
+    }
 
-      color:
-        var(
-          --tg-theme-hint-color,
-          #777777
-        );
+    .info-box {
+      padding: 12px;
 
-      font-size: 13px;
+      margin-top: 16px;
 
-      line-height: 1.7;
+      border-radius: 12px;
+
+      background:
+        rgba(0, 0, 0, 0.05);
+
+      line-height: 1.8;
     }
 
   </style>
@@ -177,36 +189,79 @@
         TaskFlow
       </h1>
 
-
       <div
-        id="message"
-        class="message"
+        id="user-info"
+        class="subtitle"
       >
-        در حال بررسی اتصال به تلگرام...
+        در حال اتصال به Telegram...
       </div>
 
 
-      <div
-        id="debug"
-        class="debug"
-      >
-        Loading...
+      <div class="info-box">
+
+        <strong>
+          Storage Test
+        </strong>
+
+        <br />
+
+        Project:
+        <b>Personal</b>
+
+        <br />
+
+        Task:
+        <b>خرید شیر</b>
+
+        <br />
+
+        Due:
+        <b>فردا 18:00</b>
+
       </div>
+
+
+      <h2>
+        Telegram CloudStorage
+      </h2>
 
 
       <button
-        id="test-button"
-        type="button"
+        id="save-button"
       >
-        تست دوباره
+        💾 ذخیره داده آزمایشی
       </button>
 
 
-      <div class="small">
+      <button
+        id="load-button"
+        class="secondary"
+      >
+        📥 خواندن داده
+      </button>
 
-        این نسخه برای تست اتصال Telegram Mini App
-        بدون لود کردن SDK از telegram.org ساخته شده است.
 
+      <button
+        id="keys-button"
+        class="secondary"
+      >
+        🔑 نمایش کلیدها
+      </button>
+
+
+      <button
+        id="delete-button"
+        class="danger"
+      >
+        🗑 پاک کردن داده
+      </button>
+
+
+      <div
+        id="status"
+        class="result"
+      >
+        Ready.
       </div>
 
     </div>
@@ -216,174 +271,465 @@
 
   <script>
 
-    function renderTelegramInfo() {
+    const tg =
+      window.Telegram?.WebApp;
 
-      const message =
-        document.getElementById("message");
+    const status =
+      document.getElementById(
+        "status"
+      );
 
-      const debug =
-        document.getElementById("debug");
-
-
-      try {
-
-        if (!window.Telegram) {
-
-          message.className =
-            "message error";
-
-          message.textContent =
-            "❌ window.Telegram پیدا نشد.";
-
-          debug.textContent =
-            "window.Telegram = undefined";
-
-          return;
-        }
+    const userInfo =
+      document.getElementById(
+        "user-info"
+      );
 
 
-        if (!window.Telegram.WebApp) {
+    // -----------------------------
+    // Test data
+    // -----------------------------
 
-          message.className =
-            "message error";
-
-          message.textContent =
-            "❌ Telegram.WebApp پیدا نشد.";
-
-          debug.textContent =
-            "window.Telegram.WebApp = undefined";
-
-          return;
-        }
+    const STORAGE_KEY =
+      "taskflow_test_v1";
 
 
-        const tg =
-          window.Telegram.WebApp;
+    const testData = {
+
+      version: 1,
+
+      project: {
+        id: "personal",
+        name: "Personal",
+        type: "personal"
+      },
+
+      task: {
+        id: "test_task_001",
+        project_id: "personal",
+        title: "خرید شیر",
+        due: "tomorrow 18:00",
+        status: "open"
+      },
+
+      saved_at:
+        new Date().toISOString()
+
+    };
 
 
-        tg.ready();
+    function show(
+      message,
+      type
+    ) {
 
+      status.className =
+        "result";
 
-        try {
-          tg.expand();
-        }
-        catch (error) {
-          console.warn(
-            "expand failed:",
-            error
-          );
-        }
-
-
-        const user =
-          tg.initDataUnsafe?.user;
-
-
-        if (user) {
-
-          message.className =
-            "message success";
-
-          message.textContent =
-            `✅ سلام ${user.first_name || ""} 👋`;
-
-        }
-
-        else {
-
-          message.className =
-            "message error";
-
-          message.textContent =
-            "⚠️ Telegram WebApp پیدا شد، ولی User دریافت نشد.";
-
-        }
-
-
-        const hashLength =
-          window.location.hash.length;
-
-
-        const info = [
-
-          "Telegram object: true",
-
-          "WebApp object: true",
-
-          "Platform: " +
-            (tg.platform || "unknown"),
-
-          "Version: " +
-            (tg.version || "unknown"),
-
-          "InitData length: " +
-            (tg.initData?.length || 0),
-
-          "URL hash length: " +
-            hashLength,
-
-          "User available: " +
-            Boolean(user)
-
-        ];
-
-
-        if (user) {
-
-          info.push(
-            "User ID: " +
-            user.id
-          );
-
-          info.push(
-            "First name: " +
-            (user.first_name || "")
-          );
-
-          info.push(
-            "Username: @" +
-            (user.username || "")
-          );
-
-        }
-
-
-        debug.textContent =
-          info.join("\n");
-
+      if (type === "success") {
+        status.classList.add(
+          "success"
+        );
       }
 
-      catch (error) {
+      if (type === "error") {
+        status.classList.add(
+          "error"
+        );
+      }
 
-        message.className =
-          "message error";
+      status.textContent =
+        message;
+    }
 
-        message.textContent =
-          "❌ JavaScript error";
 
-        debug.textContent =
-          error?.stack ||
-          error?.message ||
-          String(error);
+    function formatError(error) {
 
+      if (!error) {
+        return "Unknown error";
+      }
+
+      if (
+        typeof error === "string"
+      ) {
+        return error;
+      }
+
+      try {
+        return JSON.stringify(
+          error,
+          null,
+          2
+        );
+      }
+      catch (_) {
+        return String(error);
       }
 
     }
 
 
+    function initialize() {
+
+      if (!tg) {
+
+        userInfo.textContent =
+          "❌ Telegram WebApp پیدا نشد.";
+
+        show(
+          "window.Telegram.WebApp is unavailable",
+          "error"
+        );
+
+        return;
+      }
+
+
+      tg.ready();
+
+      try {
+        tg.expand();
+      }
+      catch (_) {}
+
+
+      const user =
+        tg.initDataUnsafe?.user;
+
+
+      if (user) {
+
+        userInfo.textContent =
+          `✅ سلام ${user.first_name || ""} — Telegram connected`;
+
+      }
+
+      else {
+
+        userInfo.textContent =
+          "⚠️ Telegram متصل است ولی user موجود نیست.";
+
+      }
+
+
+      show(
+        [
+          "Telegram connected: true",
+
+          "Platform: " +
+            tg.platform,
+
+          "Version: " +
+            tg.version,
+
+          "CloudStorage available: " +
+            Boolean(
+              tg.CloudStorage
+            )
+
+        ].join("\n")
+      );
+
+    }
+
+
+    // -----------------------------
+    // SAVE
+    // -----------------------------
+
+    function saveData() {
+
+      if (!tg?.CloudStorage) {
+
+        show(
+          "CloudStorage unavailable.",
+          "error"
+        );
+
+        return;
+      }
+
+
+      const value =
+        JSON.stringify(
+          testData
+        );
+
+
+      show(
+        "Saving..."
+      );
+
+
+      tg.CloudStorage.setItem(
+        STORAGE_KEY,
+        value,
+        function (
+          error,
+          stored
+        ) {
+
+          if (error) {
+
+            show(
+              "SAVE ERROR:\n" +
+              formatError(error),
+              "error"
+            );
+
+            return;
+          }
+
+
+          show(
+            [
+              "SAVE SUCCESS ✅",
+
+              "Stored: " +
+                stored,
+
+              "Key: " +
+                STORAGE_KEY,
+
+              "",
+
+              value
+
+            ].join("\n"),
+            "success"
+          );
+
+        }
+      );
+
+    }
+
+
+    // -----------------------------
+    // LOAD
+    // -----------------------------
+
+    function loadData() {
+
+      if (!tg?.CloudStorage) {
+
+        show(
+          "CloudStorage unavailable.",
+          "error"
+        );
+
+        return;
+      }
+
+
+      show(
+        "Loading..."
+      );
+
+
+      tg.CloudStorage.getItem(
+        STORAGE_KEY,
+
+        function (
+          error,
+          value
+        ) {
+
+          if (error) {
+
+            show(
+              "LOAD ERROR:\n" +
+              formatError(error),
+              "error"
+            );
+
+            return;
+          }
+
+
+          if (!value) {
+
+            show(
+              "No stored value found."
+            );
+
+            return;
+          }
+
+
+          let parsed;
+
+
+          try {
+
+            parsed =
+              JSON.parse(value);
+
+          }
+
+          catch (_) {
+
+            parsed =
+              value;
+
+          }
+
+
+          show(
+            "LOAD SUCCESS ✅\n\n" +
+            JSON.stringify(
+              parsed,
+              null,
+              2
+            ),
+            "success"
+          );
+
+        }
+      );
+
+    }
+
+
+    // -----------------------------
+    // KEYS
+    // -----------------------------
+
+    function loadKeys() {
+
+      show(
+        "Loading keys..."
+      );
+
+
+      tg.CloudStorage.getKeys(
+        function (
+          error,
+          keys
+        ) {
+
+          if (error) {
+
+            show(
+              "GET KEYS ERROR:\n" +
+              formatError(error),
+              "error"
+            );
+
+            return;
+          }
+
+
+          show(
+            "KEYS ✅\n\n" +
+            JSON.stringify(
+              keys,
+              null,
+              2
+            ),
+            "success"
+          );
+
+        }
+      );
+
+    }
+
+
+    // -----------------------------
+    // DELETE
+    // -----------------------------
+
+    function deleteData() {
+
+      show(
+        "Deleting..."
+      );
+
+
+      tg.CloudStorage.removeItem(
+        STORAGE_KEY,
+
+        function (
+          error,
+          removed
+        ) {
+
+          if (error) {
+
+            show(
+              "DELETE ERROR:\n" +
+              formatError(error),
+              "error"
+            );
+
+            return;
+          }
+
+
+          show(
+            [
+              "DELETE SUCCESS ✅",
+
+              "Removed: " +
+                removed
+
+            ].join("\n"),
+            "success"
+          );
+
+        }
+      );
+
+    }
+
+
+    // -----------------------------
+    // Events
+    // -----------------------------
+
     document
       .getElementById(
-        "test-button"
+        "save-button"
       )
       .addEventListener(
         "click",
-        renderTelegramInfo
+        saveData
+      );
+
+
+    document
+      .getElementById(
+        "load-button"
+      )
+      .addEventListener(
+        "click",
+        loadData
+      );
+
+
+    document
+      .getElementById(
+        "keys-button"
+      )
+      .addEventListener(
+        "click",
+        loadKeys
+      );
+
+
+    document
+      .getElementById(
+        "delete-button"
+      )
+      .addEventListener(
+        "click",
+        deleteData
       );
 
 
     window.addEventListener(
       "load",
-      renderTelegramInfo
+      initialize
     );
 
   </script>
