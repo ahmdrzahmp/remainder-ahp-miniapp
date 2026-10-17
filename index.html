@@ -1,110 +1,393 @@
 <!doctype html>
+
 <html lang="fa" dir="rtl">
+
 <head>
+
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>TaskFlow</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
 
-  <!-- Telegram Mini App SDK -->
-  <script src="https://telegram.org/js/telegram-web-app.js?64"></script>
+  <title>Remainder Ahp</title>
+
+  <!--
+    Local Telegram bridge.
+    No request to telegram.org is required.
+  -->
+  <script src="./telegram-web-app.js"></script>
 
   <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: sans-serif;
       margin: 0;
+
       padding: 24px;
-      background: var(--tg-theme-bg-color, #ffffff);
-      color: var(--tg-theme-text-color, #111111);
+
+      font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+      background:
+        var(
+          --tg-theme-bg-color,
+          #ffffff
+        );
+
+      color:
+        var(
+          --tg-theme-text-color,
+          #111111
+        );
+    }
+
+    .container {
+      max-width: 520px;
+
+      margin: 50px auto;
     }
 
     .card {
-      max-width: 480px;
-      margin: 40px auto;
       padding: 24px;
-      border-radius: 16px;
-      background: var(--tg-theme-secondary-bg-color, #f3f3f3);
+
+      border-radius: 20px;
+
+      background:
+        var(
+          --tg-theme-secondary-bg-color,
+          #f2f2f2
+        );
     }
 
-    .status {
-      margin-top: 12px;
-      padding: 12px;
-      border-radius: 10px;
-      background: rgba(0, 0, 0, 0.05);
-      direction: ltr;
-      text-align: left;
-      white-space: pre-wrap;
-      font-family: monospace;
-      font-size: 13px;
+    h1 {
+      margin-top: 0;
+
+      margin-bottom: 20px;
+
+      font-size: 30px;
     }
+
+    .message {
+      font-size: 17px;
+
+      line-height: 1.8;
+    }
+
+    .success {
+      color: #1b8f4b;
+    }
+
+    .error {
+      color: #d93025;
+    }
+
+    .debug {
+      margin-top: 20px;
+
+      padding: 14px;
+
+      border-radius: 14px;
+
+      direction: ltr;
+
+      text-align: left;
+
+      white-space: pre-wrap;
+
+      word-break: break-word;
+
+      background: rgba(0, 0, 0, 0.06);
+
+      font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        monospace;
+
+      font-size: 13px;
+
+      line-height: 1.6;
+    }
+
+    button {
+      width: 100%;
+
+      margin-top: 20px;
+
+      padding: 15px;
+
+      border: 0;
+
+      border-radius: 14px;
+
+      cursor: pointer;
+
+      font-size: 16px;
+
+      background:
+        var(
+          --tg-theme-button-color,
+          #2481cc
+        );
+
+      color:
+        var(
+          --tg-theme-button-text-color,
+          #ffffff
+        );
+    }
+
+    .small {
+      margin-top: 18px;
+
+      color:
+        var(
+          --tg-theme-hint-color,
+          #777777
+        );
+
+      font-size: 13px;
+
+      line-height: 1.7;
+    }
+
   </style>
+
 </head>
+
 
 <body>
 
-  <div class="card">
-    <h1>TaskFlow</h1>
+  <div class="container">
 
-    <p id="message">
-      در حال اتصال به Telegram...
-    </p>
+    <div class="card">
 
-    <div id="debug" class="status">
-      Loading...
+      <h1>
+        TaskFlow
+      </h1>
+
+
+      <div
+        id="message"
+        class="message"
+      >
+        در حال بررسی اتصال به تلگرام...
+      </div>
+
+
+      <div
+        id="debug"
+        class="debug"
+      >
+        Loading...
+      </div>
+
+
+      <button
+        id="test-button"
+        type="button"
+      >
+        تست دوباره
+      </button>
+
+
+      <div class="small">
+
+        این نسخه برای تست اتصال Telegram Mini App
+        بدون لود کردن SDK از telegram.org ساخته شده است.
+
+      </div>
+
     </div>
+
   </div>
 
+
   <script>
-    function initTelegram() {
-      const debug = document.getElementById("debug");
-      const message = document.getElementById("message");
+
+    function renderTelegramInfo() {
+
+      const message =
+        document.getElementById("message");
+
+      const debug =
+        document.getElementById("debug");
+
 
       try {
+
         if (!window.Telegram) {
-          message.textContent = "Telegram object پیدا نشد ❌";
+
+          message.className =
+            "message error";
+
+          message.textContent =
+            "❌ window.Telegram پیدا نشد.";
+
           debug.textContent =
             "window.Telegram = undefined";
+
           return;
         }
+
 
         if (!window.Telegram.WebApp) {
-          message.textContent = "Telegram WebApp پیدا نشد ❌";
+
+          message.className =
+            "message error";
+
+          message.textContent =
+            "❌ Telegram.WebApp پیدا نشد.";
+
           debug.textContent =
             "window.Telegram.WebApp = undefined";
+
           return;
         }
 
-        const tg = window.Telegram.WebApp;
+
+        const tg =
+          window.Telegram.WebApp;
+
 
         tg.ready();
-        tg.expand();
 
-        const user = tg.initDataUnsafe?.user;
 
-        if (user) {
-          message.textContent =
-            `سلام ${user.first_name || ""} 👋`;
-        } else {
-          message.textContent =
-            "Telegram متصل است ولی اطلاعات User دریافت نشد.";
+        try {
+          tg.expand();
+        }
+        catch (error) {
+          console.warn(
+            "expand failed:",
+            error
+          );
         }
 
-        debug.textContent =
-          "WebApp: true\n" +
-          "Platform: " + tg.platform + "\n" +
-          "Version: " + tg.version + "\n" +
-          "InitData length: " + (tg.initData?.length || 0) + "\n" +
-          "User available: " + Boolean(user);
 
-      } catch (error) {
-        message.textContent = "خطای JavaScript ❌";
+        const user =
+          tg.initDataUnsafe?.user;
+
+
+        if (user) {
+
+          message.className =
+            "message success";
+
+          message.textContent =
+            `✅ سلام ${user.first_name || ""} 👋`;
+
+        }
+
+        else {
+
+          message.className =
+            "message error";
+
+          message.textContent =
+            "⚠️ Telegram WebApp پیدا شد، ولی User دریافت نشد.";
+
+        }
+
+
+        const hashLength =
+          window.location.hash.length;
+
+
+        const info = [
+
+          "Telegram object: true",
+
+          "WebApp object: true",
+
+          "Platform: " +
+            (tg.platform || "unknown"),
+
+          "Version: " +
+            (tg.version || "unknown"),
+
+          "InitData length: " +
+            (tg.initData?.length || 0),
+
+          "URL hash length: " +
+            hashLength,
+
+          "User available: " +
+            Boolean(user)
+
+        ];
+
+
+        if (user) {
+
+          info.push(
+            "User ID: " +
+            user.id
+          );
+
+          info.push(
+            "First name: " +
+            (user.first_name || "")
+          );
+
+          info.push(
+            "Username: @" +
+            (user.username || "")
+          );
+
+        }
+
+
         debug.textContent =
-          error?.stack || error?.message || String(error);
+          info.join("\n");
+
       }
+
+      catch (error) {
+
+        message.className =
+          "message error";
+
+        message.textContent =
+          "❌ JavaScript error";
+
+        debug.textContent =
+          error?.stack ||
+          error?.message ||
+          String(error);
+
+      }
+
     }
 
-    window.addEventListener("load", initTelegram);
+
+    document
+      .getElementById(
+        "test-button"
+      )
+      .addEventListener(
+        "click",
+        renderTelegramInfo
+      );
+
+
+    window.addEventListener(
+      "load",
+      renderTelegramInfo
+    );
+
   </script>
 
 </body>
+
 </html>
