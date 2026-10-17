@@ -1,817 +1,460 @@
-<!doctype html>
+(function () {
+  "use strict";
 
-<html lang="fa" dir="rtl">
+  // -----------------------------
+  // Helpers
+  // -----------------------------
 
-<head>
+  function randomId() {
+    return (
+      Date.now().toString(36) +
+      "_" +
+      Math.random().toString(36).slice(2, 10)
+    );
+  }
 
-  <meta charset="UTF-8" />
+  function getLaunchParams() {
+    const hash = window.location.hash.startsWith("#")
+      ? window.location.hash.slice(1)
+      : window.location.hash;
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
+    const hashParams = new URLSearchParams(hash);
+    const searchParams = new URLSearchParams(window.location.search);
 
-  <title>TaskFlow — Telegram API Authentication</title>
-
-  <script src="./telegram-web-app.js"></script>
-
-  <style>
-
-    * {
-      box-sizing: border-box;
+    function get(name) {
+      return hashParams.get(name) || searchParams.get(name) || "";
     }
 
-    body {
-      margin: 0;
-      padding: 20px;
-
-      font-family:
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-
-      background:
-        var(
-          --tg-theme-bg-color,
-          #ffffff
-        );
-
-      color:
-        var(
-          --tg-theme-text-color,
-          #111111
-        );
-    }
-
-    .container {
-      max-width: 540px;
-      margin: 24px auto;
-    }
-
-    .card {
-      padding: 22px;
-
-      border-radius: 20px;
-
-      background:
-        var(
-          --tg-theme-secondary-bg-color,
-          #f2f2f2
-        );
-    }
-
-    h1 {
-      margin-top: 0;
-      margin-bottom: 8px;
-    }
-
-    h2 {
-      margin-top: 28px;
-      font-size: 18px;
-    }
-
-    .subtitle {
-      color:
-        var(
-          --tg-theme-hint-color,
-          #777
-        );
-
-      line-height: 1.7;
-
-      font-size: 14px;
-    }
-
-    button {
-      width: 100%;
-
-      padding: 14px;
-
-      margin-top: 10px;
-
-      border: none;
-
-      border-radius: 13px;
-
-      cursor: pointer;
-
-      font-size: 15px;
-
-      background:
-        var(
-          --tg-theme-button-color,
-          #2481cc
-        );
-
-      color:
-        var(
-          --tg-theme-button-text-color,
-          #fff
-        );
-    }
-
-    button.secondary {
-      background: #666;
-    }
-
-    button.danger {
-      background: #b3261e;
-    }
-
-    .result {
-      margin-top: 18px;
-
-      padding: 14px;
-
-      min-height: 80px;
-
-      border-radius: 14px;
-
-      direction: ltr;
-
-      text-align: left;
-
-      white-space: pre-wrap;
-
-      word-break: break-word;
-
-      background:
-        rgba(0, 0, 0, 0.07);
-
-      font-family:
-        ui-monospace,
-        SFMono-Regular,
-        Menlo,
-        Monaco,
-        Consolas,
-        monospace;
-
-      font-size: 13px;
-
-      line-height: 1.6;
-    }
-
-    .auth-panel {
-      margin-top: 18px;
-      padding: 14px;
-      border: 1px solid rgba(127,127,127,.25);
-      border-radius: 14px;
-    }
-
-    .auth-panel p { line-height: 1.8; }
-
-    .success {
-      color: #14833b;
-    }
-
-    .error {
-      color: #c62828;
-    }
-
-    .info-box {
-      padding: 12px;
-
-      margin-top: 16px;
-
-      border-radius: 12px;
-
-      background:
-        rgba(0, 0, 0, 0.05);
-
-      line-height: 1.8;
-    }
-
-  </style>
-
-</head>
-
-
-<body>
-
-  <div class="container">
-
-    <div class="card">
-
-      <h1>
-        TaskFlow
-      </h1>
-
-      <div
-        id="user-info"
-        class="subtitle"
-      >
-        در حال اتصال به Telegram...
-      </div>
-
-
-      <div class="info-box">
-
-        <strong>
-          Storage Test
-        </strong>
-
-        <br />
-
-        Project:
-        <b>Personal</b>
-
-        <br />
-
-        Task:
-        <b>خرید شیر</b>
-
-        <br />
-
-        Due:
-        <b>فردا 18:00</b>
-
-      </div>
-
-
-      <section class="auth-panel" aria-labelledby="api-auth-heading">
-        <h2 id="api-auth-heading">اتصال امن به TaskFlow API</h2>
-        <p class="subtitle">درخواست با initData خام تلگرام ارسال می‌شود؛ هیچ توکن رباتی در این صفحه قرار ندارد.</p>
-        <button id="auth-button" type="button">🔐 تست احراز هویت تلگرام</button>
-        <div id="auth-status" class="result" role="status" aria-live="polite">در انتظار شروع تست...</div>
-      </section>
-
-      <h2>
-        Telegram CloudStorage
-      </h2>
-
-
-      <button
-        id="save-button"
-      >
-        💾 ذخیره داده آزمایشی
-      </button>
-
-
-      <button
-        id="load-button"
-        class="secondary"
-      >
-        📥 خواندن داده
-      </button>
-
-
-      <button
-        id="keys-button"
-        class="secondary"
-      >
-        🔑 نمایش کلیدها
-      </button>
-
-
-      <button
-        id="delete-button"
-        class="danger"
-      >
-        🗑 پاک کردن داده
-      </button>
-
-
-      <div
-        id="status"
-        class="result"
-      >
-        Ready.
-      </div>
-
-    </div>
-
-  </div>
-
-
-  <script>
-
-    const API_URL = "https://taskflow-reminder.ahmad-ap0111-1.workers.dev";
-
-    const tg =
-      window.Telegram?.WebApp;
-
-    const authStatus = document.getElementById("auth-status");
-    const authButton = document.getElementById("auth-button");
-
-    function setAuthStatus(message, type = "") {
-      authStatus.className = "result" + (type ? " " + type : "");
-      authStatus.textContent = message;
-    }
-
-    async function authenticateTelegram() {
-      const rawInitData = tg?.initData;
-
-      if (!rawInitData) {
-        setAuthStatus(
-          "❌ initData در دسترس نیست. Mini App را از طریق خود ربات در تلگرام باز کن.",
-          "error"
-        );
-        return;
-      }
-
-      authButton.disabled = true;
-      setAuthStatus("در حال اعتبارسنجی امن در Cloudflare Worker...");
-
-      try {
-        const response = await fetch(API_URL + "/api/auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData: rawInitData }),
-          cache: "no-store"
-        });
-
-        const result = await response.json();
-        if (!response.ok || !result.authenticated) {
-          throw new Error(
-            "HTTP " + response.status + ": " +
-            (result.error || "Authentication failed")
-          );
-        }
-
-        const user = result.user || {};
-        setAuthStatus(
-          "✅ authenticated: true\n" +
-          "Telegram user ID: " + user.id + "\n" +
-          "Name: " + (user.first_name || "") + "\n" +
-          "Username: " + (user.username || "—"),
-          "success"
-        );
-      } catch (error) {
-        setAuthStatus(
-          "❌ احراز هویت ناموفق بود.\n" +
-          (error?.message || String(error)) +
-          "\nاگر Failed to fetch دیدی، CORS و MINI_APP_ORIGIN را بررسی کن.",
-          "error"
-        );
-      } finally {
-        authButton.disabled = false;
-      }
-    }
-
-    const status =
-      document.getElementById(
-        "status"
-      );
-
-    const userInfo =
-      document.getElementById(
-        "user-info"
-      );
-
-
-    // -----------------------------
-    // Test data
-    // -----------------------------
-
-    const STORAGE_KEY =
-      "taskflow_test_v1";
-
-
-    const testData = {
-
-      version: 1,
-
-      project: {
-        id: "personal",
-        name: "Personal",
-        type: "personal"
-      },
-
-      task: {
-        id: "test_task_001",
-        project_id: "personal",
-        title: "خرید شیر",
-        due: "tomorrow 18:00",
-        status: "open"
-      },
-
-      saved_at:
-        new Date().toISOString()
-
+    return {
+      initData: get("tgWebAppData"),
+      version: get("tgWebAppVersion"),
+      platform: get("tgWebAppPlatform"),
+      themeParamsRaw: get("tgWebAppThemeParams"),
     };
+  }
 
+  function parseInitData(initData) {
+    const result = {};
 
-    function show(
-      message,
-      type
-    ) {
-
-      status.className =
-        "result";
-
-      if (type === "success") {
-        status.classList.add(
-          "success"
-        );
-      }
-
-      if (type === "error") {
-        status.classList.add(
-          "error"
-        );
-      }
-
-      status.textContent =
-        message;
+    if (!initData) {
+      return result;
     }
 
+    try {
+      const params = new URLSearchParams(initData);
 
-    function formatError(error) {
-
-      if (!error) {
-        return "Unknown error";
+      for (const [key, value] of params.entries()) {
+        result[key] = value;
       }
 
-      if (
-        typeof error === "string"
-      ) {
-        return error;
-      }
-
-      try {
-        return JSON.stringify(
-          error,
-          null,
-          2
-        );
-      }
-      catch (_) {
-        return String(error);
-      }
-
-    }
-
-
-    function initialize() {
-
-      if (!tg) {
-
-        userInfo.textContent =
-          "❌ Telegram WebApp پیدا نشد.";
-
-        show(
-          "window.Telegram.WebApp is unavailable",
-          "error"
-        );
-
-        return;
-      }
-
-
-      tg.ready();
-
-      try {
-        tg.expand();
-      }
-      catch (_) {}
-
-
-      const user =
-        tg.initDataUnsafe?.user;
-
-
-      if (user) {
-
-        userInfo.textContent =
-          `✅ سلام ${user.first_name || ""} — Telegram connected`;
-
-      }
-
-      else {
-
-        userInfo.textContent =
-          "⚠️ Telegram متصل است ولی user موجود نیست.";
-
-      }
-
-
-      show(
-        [
-          "Telegram connected: true",
-
-          "Platform: " +
-            tg.platform,
-
-          "Version: " +
-            tg.version,
-
-          "CloudStorage available: " +
-            Boolean(
-              tg.CloudStorage
-            )
-
-        ].join("\n")
-      );
-
-    }
-
-
-    // -----------------------------
-    // SAVE
-    // -----------------------------
-
-    function saveData() {
-
-      if (!tg?.CloudStorage) {
-
-        show(
-          "CloudStorage unavailable.",
-          "error"
-        );
-
-        return;
-      }
-
-
-      const value =
-        JSON.stringify(
-          testData
-        );
-
-
-      show(
-        "Saving..."
-      );
-
-
-      tg.CloudStorage.setItem(
-        STORAGE_KEY,
-        value,
-        function (
-          error,
-          stored
-        ) {
-
-          if (error) {
-
-            show(
-              "SAVE ERROR:\n" +
-              formatError(error),
-              "error"
-            );
-
-            return;
-          }
-
-
-          show(
-            [
-              "SAVE SUCCESS ✅",
-
-              "Stored: " +
-                stored,
-
-              "Key: " +
-                STORAGE_KEY,
-
-              "",
-
-              value
-
-            ].join("\n"),
-            "success"
-          );
-
-        }
-      );
-
-    }
-
-
-    // -----------------------------
-    // LOAD
-    // -----------------------------
-
-    function loadData() {
-
-      if (!tg?.CloudStorage) {
-
-        show(
-          "CloudStorage unavailable.",
-          "error"
-        );
-
-        return;
-      }
-
-
-      show(
-        "Loading..."
-      );
-
-
-      tg.CloudStorage.getItem(
-        STORAGE_KEY,
-
-        function (
-          error,
-          value
-        ) {
-
-          if (error) {
-
-            show(
-              "LOAD ERROR:\n" +
-              formatError(error),
-              "error"
-            );
-
-            return;
-          }
-
-
-          if (!value) {
-
-            show(
-              "No stored value found."
-            );
-
-            return;
-          }
-
-
-          let parsed;
-
-
+      ["user", "receiver", "chat"].forEach((field) => {
+        if (result[field]) {
           try {
-
-            parsed =
-              JSON.parse(value);
-
-          }
-
-          catch (_) {
-
-            parsed =
-              value;
-
-          }
-
-
-          show(
-            "LOAD SUCCESS ✅\n\n" +
-            JSON.stringify(
-              parsed,
-              null,
-              2
-            ),
-            "success"
-          );
-
+            result[field] = JSON.parse(result[field]);
+          } catch (_) {}
         }
+      });
+
+      return result;
+    } catch (error) {
+      console.error("Could not parse initData:", error);
+      return {};
+    }
+  }
+
+  function parseThemeParams(raw) {
+    if (!raw) return {};
+
+    try {
+      return JSON.parse(raw);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  // -----------------------------
+  // Telegram event bridge
+  // -----------------------------
+
+  const pendingCallbacks = new Map();
+
+  function postTelegramEvent(eventType, eventData) {
+    const data = eventData || {};
+
+    // Telegram Desktop / mobile WebView
+    if (
+      window.TelegramWebviewProxy &&
+      typeof window.TelegramWebviewProxy.postEvent === "function"
+    ) {
+      window.TelegramWebviewProxy.postEvent(
+        eventType,
+        JSON.stringify(data)
       );
 
+      return true;
     }
 
-
-    // -----------------------------
-    // KEYS
-    // -----------------------------
-
-    function loadKeys() {
-
-      show(
-        "Loading keys..."
+    // Windows Phone / legacy style
+    if (
+      window.external &&
+      typeof window.external.notify === "function"
+    ) {
+      window.external.notify(
+        JSON.stringify({
+          eventType: eventType,
+          eventData: data,
+        })
       );
 
-
-      tg.CloudStorage.getKeys(
-        function (
-          error,
-          keys
-        ) {
-
-          if (error) {
-
-            show(
-              "GET KEYS ERROR:\n" +
-              formatError(error),
-              "error"
-            );
-
-            return;
-          }
-
-
-          show(
-            "KEYS ✅\n\n" +
-            JSON.stringify(
-              keys,
-              null,
-              2
-            ),
-            "success"
-          );
-
-        }
-      );
-
+      return true;
     }
 
-
-    // -----------------------------
-    // DELETE
-    // -----------------------------
-
-    function deleteData() {
-
-      show(
-        "Deleting..."
+    // iframe fallback
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        JSON.stringify({
+          eventType: eventType,
+          eventData: data,
+        }),
+        "*"
       );
 
-
-      tg.CloudStorage.removeItem(
-        STORAGE_KEY,
-
-        function (
-          error,
-          removed
-        ) {
-
-          if (error) {
-
-            show(
-              "DELETE ERROR:\n" +
-              formatError(error),
-              "error"
-            );
-
-            return;
-          }
-
-
-          show(
-            [
-              "DELETE SUCCESS ✅",
-
-              "Removed: " +
-                removed
-
-            ].join("\n"),
-            "success"
-          );
-
-        }
-      );
-
+      return true;
     }
 
+    console.warn("No Telegram bridge available for:", eventType);
 
-    // -----------------------------
-    // Events
-    // -----------------------------
+    return false;
+  }
 
-    authButton.addEventListener("click", authenticateTelegram);
+  function handleTelegramEvent(eventType, eventData) {
+    let data = eventData;
 
-    document
-      .getElementById(
-        "save-button"
-      )
-      .addEventListener(
-        "click",
-        saveData
-      );
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch (_) {}
+    }
 
+    if (eventType === "custom_method_invoked") {
+      const requestId = data?.req_id;
 
-    document
-      .getElementById(
-        "load-button"
-      )
-      .addEventListener(
-        "click",
-        loadData
-      );
+      if (!requestId) {
+        return;
+      }
 
+      const callback = pendingCallbacks.get(requestId);
 
-    document
-      .getElementById(
-        "keys-button"
-      )
-      .addEventListener(
-        "click",
-        loadKeys
-      );
+      if (!callback) {
+        return;
+      }
 
+      pendingCallbacks.delete(requestId);
 
-    document
-      .getElementById(
-        "delete-button"
-      )
-      .addEventListener(
-        "click",
-        deleteData
-      );
+      if (data.error) {
+        callback(data.error, null);
+        return;
+      }
 
+      let result = data.result;
 
-    window.addEventListener(
-      "load",
-      initialize
+      // Some clients may return JSON as a string.
+      if (typeof result === "string") {
+        try {
+          result = JSON.parse(result);
+        } catch (_) {}
+      }
+
+      callback(null, result);
+    }
+  }
+
+  // Telegram clients commonly call these global receive methods.
+  window.TelegramGameProxy_receiveEvent = function (
+    eventType,
+    eventData
+  ) {
+    handleTelegramEvent(eventType, eventData);
+  };
+
+  window.TelegramGameProxy = {
+    receiveEvent: function (eventType, eventData) {
+      handleTelegramEvent(eventType, eventData);
+    },
+  };
+
+  // -----------------------------
+  // WebView API
+  // -----------------------------
+
+  const WebView = {
+    postEvent: postTelegramEvent,
+
+    receiveEvent: function (eventType, eventData) {
+      handleTelegramEvent(eventType, eventData);
+    },
+  };
+
+  // -----------------------------
+  // Custom methods
+  // -----------------------------
+
+  function invokeCustomMethod(method, params, callback) {
+    const requestId = randomId();
+
+    if (typeof callback === "function") {
+      pendingCallbacks.set(requestId, callback);
+    }
+
+    const success = postTelegramEvent(
+      "web_app_invoke_custom_method",
+      {
+        req_id: requestId,
+        method: method,
+        params: params || {},
+      }
     );
 
-  </script>
+    if (!success) {
+      pendingCallbacks.delete(requestId);
 
-</body>
+      if (typeof callback === "function") {
+        callback(
+          "Telegram bridge unavailable",
+          null
+        );
+      }
+    }
 
-</html>
+    // Avoid callbacks hanging forever.
+    setTimeout(function () {
+      if (pendingCallbacks.has(requestId)) {
+        const cb = pendingCallbacks.get(requestId);
+
+        pendingCallbacks.delete(requestId);
+
+        cb(
+          "Telegram request timeout",
+          null
+        );
+      }
+    }, 10000);
+  }
+
+  // -----------------------------
+  // CloudStorage
+  // -----------------------------
+
+  const CloudStorage = {};
+
+  CloudStorage.setItem = function (
+    key,
+    value,
+    callback
+  ) {
+    invokeCustomMethod(
+      "saveStorageValue",
+      {
+        key: String(key),
+        value: String(value),
+      },
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.getItem = function (
+    key,
+    callback
+  ) {
+    CloudStorage.getItems(
+      [key],
+      function (error, result) {
+        if (error) {
+          callback?.(error);
+          return;
+        }
+
+        callback?.(
+          null,
+          result ? result[key] : undefined
+        );
+      }
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.getItems = function (
+    keys,
+    callback
+  ) {
+    invokeCustomMethod(
+      "getStorageValues",
+      {
+        keys: keys.map(String),
+      },
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.removeItem = function (
+    key,
+    callback
+  ) {
+    CloudStorage.removeItems(
+      [key],
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.removeItems = function (
+    keys,
+    callback
+  ) {
+    invokeCustomMethod(
+      "deleteStorageValues",
+      {
+        keys: keys.map(String),
+      },
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  CloudStorage.getKeys = function (
+    callback
+  ) {
+    invokeCustomMethod(
+      "getStorageKeys",
+      {},
+      callback
+    );
+
+    return CloudStorage;
+  };
+
+  // -----------------------------
+  // Mini App initialization
+  // -----------------------------
+
+  const launch = getLaunchParams();
+
+  const initDataUnsafe =
+    parseInitData(launch.initData);
+
+  const themeParams =
+    parseThemeParams(
+      launch.themeParamsRaw
+    );
+
+  const WebApp = {
+    initData: launch.initData || "",
+
+    initDataUnsafe: initDataUnsafe,
+
+    version:
+      launch.version || "unknown",
+
+    platform:
+      launch.platform || "unknown",
+
+    themeParams: themeParams,
+
+    CloudStorage: CloudStorage,
+
+    ready: function () {
+      postTelegramEvent(
+        "web_app_ready",
+        {}
+      );
+    },
+
+    expand: function () {
+      postTelegramEvent(
+        "web_app_expand",
+        {}
+      );
+    },
+
+    close: function () {
+      postTelegramEvent(
+        "web_app_close",
+        {}
+      );
+    },
+  };
+
+  // -----------------------------
+  // Theme variables
+  // -----------------------------
+
+  const cssMap = {
+    bg_color:
+      "--tg-theme-bg-color",
+
+    text_color:
+      "--tg-theme-text-color",
+
+    hint_color:
+      "--tg-theme-hint-color",
+
+    button_color:
+      "--tg-theme-button-color",
+
+    button_text_color:
+      "--tg-theme-button-text-color",
+
+    secondary_bg_color:
+      "--tg-theme-secondary-bg-color",
+  };
+
+  Object.entries(cssMap).forEach(
+    ([telegramKey, cssVariable]) => {
+      if (themeParams[telegramKey]) {
+        document.documentElement.style.setProperty(
+          cssVariable,
+          themeParams[telegramKey]
+        );
+      }
+    }
+  );
+
+  // -----------------------------
+  // Export global Telegram object
+  // -----------------------------
+
+  window.Telegram =
+    window.Telegram || {};
+
+  window.Telegram.WebView =
+    WebView;
+
+  window.Telegram.WebApp =
+    WebApp;
+
+  console.log(
+    "TaskFlow Telegram bridge loaded"
+  );
+
+  console.log(
+    "Platform:",
+    WebApp.platform
+  );
+
+  console.log(
+    "Version:",
+    WebApp.version
+  );
+
+  console.log(
+    "User:",
+    WebApp.initDataUnsafe.user
+  );
+})();
